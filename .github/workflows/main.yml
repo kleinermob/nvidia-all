@@ -1,0 +1,41 @@
+name: Build PKGBUILDs
+
+on:
+  push:
+    branches: 
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Enable Multilib and Update System
+        run: |
+          echo -e "[multilib]\nInclude = /etc/pacman.d/mirrorlist" >> /etc/pacman.conf
+          pacman -Syu --noconfirm base-devel sudo gnupg
+
+      - name: Create Non-Root User
+        run: |
+          useradd user -G wheel && echo "user ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+          chown user -R .
+
+      - name: Build Package
+        run: |
+          su user -c "makepkg -s --noconfirm --skippgpcheck"
+
+      - name: Upload Built Package
+        uses: actions/upload-artifact@v3
+        with:
+          name: built-packages
+          path: |
+            *.pkg.tar.zst
+          if-no-files-found: warn
